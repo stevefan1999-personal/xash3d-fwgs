@@ -1047,7 +1047,7 @@ static void GL_TextureImageRAW( gl_texture_t *tex, GLint side, GLint level, GLin
 	}
 	else if( tex->target == GL_TEXTURE_2D_MULTISAMPLE )
 	{
-#if !defined( XASH_GLES )
+#if !defined( XASH_GLES ) && !defined( XASH_GL4ES )
 		samplesCount = (GLsizei)gEngfuncs.pfnGetCvarFloat("gl_msaa_samples");
 		switch (samplesCount)
 		{
@@ -1060,9 +1060,9 @@ static void GL_TextureImageRAW( gl_texture_t *tex, GLint side, GLint level, GLin
 				samplesCount = 1;
 		}
 		pglTexImage2DMultisample( tex->target, samplesCount, tex->format, width, height, GL_TRUE );
-#else /* XASH_GLES */
-		Con_Printf( S_ERROR "GLES renderer don't support GL_TEXTURE_2D_MULTISAMPLE!\n" );
-#endif /* XASH_GLES */
+#else /* !XASH_GLES && !XASH_GL4ES */
+		gEngfuncs.Con_Printf( S_ERROR "GLES renderer don't support GL_TEXTURE_2D_MULTISAMPLE!\n" );
+#endif /* !XASH_GLES && !XASH_GL4ES */
 	}
 	else // 2D or RECT
 	{
@@ -1266,7 +1266,6 @@ do specified actions on pixels
 */
 static void GL_ProcessImage( gl_texture_t *tex, rgbdata_t *pic )
 {
-	float	emboss_scale = 0.0f;
 	uint	img_flags = 0;
 
 	// force upload texture as RGB or RGBA (detail textures requires this)
@@ -1299,12 +1298,6 @@ static void GL_ProcessImage( gl_texture_t *tex, rgbdata_t *pic )
 			tex->flags &= ~TF_MAKELUMA;
 		}
 
-		if( tex->flags & TF_ALLOW_EMBOSS )
-		{
-			img_flags |= IMAGE_EMBOSS;
-			tex->flags &= ~TF_ALLOW_EMBOSS;
-		}
-
 		if( !FBitSet( tex->flags, TF_IMG_UPLOADED ) && FBitSet( tex->flags, TF_KEEP_SOURCE ))
 			tex->original = gEngfuncs.FS_CopyImage( pic ); // because current pic will be expanded to rgba
 
@@ -1312,12 +1305,8 @@ static void GL_ProcessImage( gl_texture_t *tex, rgbdata_t *pic )
 		if( pic->type == PF_INDEXED_24 || pic->type == PF_INDEXED_32 )
 			img_flags |= IMAGE_FORCE_RGBA;
 
-		// dedicated server doesn't register this variable
-		if( gl_emboss_scale != NULL )
-			emboss_scale = gl_emboss_scale->value;
-
 		// processing image before uploading (force to rgba, make luma etc)
-		if( pic->buffer ) gEngfuncs.Image_Process( &pic, 0, 0, img_flags, emboss_scale );
+		if( pic->buffer ) gEngfuncs.Image_Process( &pic, 0, 0, img_flags, 0 );
 
 		if( FBitSet( tex->flags, TF_LUMINANCE ))
 			ClearBits( pic->flags, IMAGE_HAS_COLOR );
